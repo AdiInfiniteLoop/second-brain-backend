@@ -14,7 +14,8 @@ const brainSchema = new mongoose.Schema(
             type: String,
             required: [true, 'A password must be present for a user'],
             minlength:[8, 'A minimum of 8 length is required for a user'],
-            maxlength: [20, 'A maximum of 20 length is required for a user']
+            maxlength: [20, 'A maximum of 20 length is required for a user'],
+            // select: false not working suting populating for some reason
         }
     }
 )

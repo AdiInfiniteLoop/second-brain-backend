@@ -52,7 +52,11 @@ export const login = catchAsync(async(req: Request, res: Response, next: NextFun
 
 
 export const getcontent = catchAsync(async(req: Request, res: Response, next: NextFunction): Promise<any> => {
-	const content = await ContentModel.find({})
+	const userId = req.user._id
+	const content = await ContentModel.find({userId: userId}).populate({
+		path: 'userId',
+		select: '-password'
+	})
 	res.status(200).json({
 		status: 'Success',
 		message: 'Successfully fetched contents',
@@ -62,14 +66,15 @@ export const getcontent = catchAsync(async(req: Request, res: Response, next: Ne
 
 export const getonecontent = catchAsync(async (req: Request, res: Response, next: NextFunction): Promise<any> => {
     const { id } = req.params; 
-    console.log(id);
 
     if (!id) {
         return next(new ErrorClass('No ID is passed', 400)); 
     }
-
     try {
-        const content = await ContentModel.findOne({ _id: id });
+        const content = await ContentModel.findOne({ _id: id }).populate({
+			path: 'userId',
+			select: '-password'
+		})
 
         if (!content) {
             return next(new ErrorClass('Content not found', 404));  
@@ -88,10 +93,22 @@ export const getonecontent = catchAsync(async (req: Request, res: Response, next
 
 
 export const postcontent = catchAsync(async(req: Request, res: Response, next: NextFunction): Promise<any> => {
-	if(!req.body.type || !req.body.link || !req.body.title || !req.body.tags) {
+	// if(!req.body.type || !req.body.link || !req.body.title || !req.body.tags) {
+	// 	return next(new ErrorClass('Fields are Empty', 403))
+	// }
+	if(!req.body.link || !req.body.title) {
 		return next(new ErrorClass('Fields are Empty', 403))
 	}
-	await ContentModel.create(req.body)
+	console.log(req)
+	const {title, link, type,} = req.body;
+	await ContentModel.create({
+		title,
+		link,
+		type,
+		userId: req.user._id,
+		tags: []
+	})
+
 
 	res.status(200).json({status: 'Success', message: 'Successfully posted the content'})
 })
