@@ -1,6 +1,6 @@
 import express, {NextFunction, Request, Response} from 'express'
 import {router} from './routes/brainroutes'
-import {globalErrorHandler} from './controllers/globalErrorHandler'
+import {errorHandler} from './controllers/globalErrorHandler'
 
 export const app = express();
 
@@ -12,7 +12,7 @@ app.get('/', (req : Request, res: Response) => {
 })
 app.use('/api/v1', router)
 
-app.use(globalErrorHandler)
+app.use(errorHandler)
 
 
 

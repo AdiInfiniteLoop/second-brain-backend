@@ -7,7 +7,8 @@ const brainSchema = new mongoose.Schema(
             type: String,
             required: [true, 'A username must be present for a user'],
             minlength:[3, 'A minimum of 3 length is required for a user'],
-            maxlength: [10,'A maximum of 10 length is required for a user']
+            maxlength: [10,'A maximum of 10 length is required for a user'],
+            unique: true,
         },
         password: {
             type: String,
@@ -15,7 +16,6 @@ const brainSchema = new mongoose.Schema(
             minlength:[8, 'A minimum of 8 length is required for a user'],
             maxlength: [20, 'A maximum of 20 length is required for a user']
         }
-
     }
 )
 
