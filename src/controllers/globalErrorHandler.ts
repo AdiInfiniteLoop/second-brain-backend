@@ -36,7 +36,7 @@ export const errorHandler: ErrorRequestHandler = (
   res: Response,
   next: NextFunction
 ): void => { // Ensure the return type is void
-  console.error("ddd" , err.name); // Log error for debugging
+  console.error(err); // Log error for debugging
 
   // Default error properties
   err.statusCode = err.statusCode || 500;

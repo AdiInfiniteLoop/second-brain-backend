@@ -37,7 +37,7 @@ export const login = catchAsync(async(req: Request, res: Response, next: NextFun
 
 
    if(user && process.env.JWT_SECRET) {
-	const token = jwt.sign({ _id: user._id }, process.env.JWT_SECRET, {
+	const token = jwt.sign({ _id: user._id.toString() }, process.env.JWT_SECRET, {
 		expiresIn: '2 days',
 	  });
 	res.status(200).json({status: 'Success', message: 'TOKEN Sent', token})
@@ -52,8 +52,41 @@ export const login = catchAsync(async(req: Request, res: Response, next: NextFun
 
 
 export const getcontent = catchAsync(async(req: Request, res: Response, next: NextFunction): Promise<any> => {
-
+	const content = await ContentModel.find({})
+	res.status(200).json({
+		status: 'Success',
+		message: 'Successfully fetched contents',
+		content
+	})
 })
+
+export const getonecontent = catchAsync(async (req: Request, res: Response, next: NextFunction): Promise<any> => {
+    const { id } = req.params; 
+    console.log(id);
+
+    if (!id) {
+        return next(new ErrorClass('No ID is passed', 400)); 
+    }
+
+    try {
+        const content = await ContentModel.findOne({ _id: id });
+
+        if (!content) {
+            return next(new ErrorClass('Content not found', 404));  
+        }
+
+        res.status(200).json({
+            status: 'Success',
+            message: 'Successfully fetched content',
+            content: content,
+        });
+    } catch (error: any) {
+        return next(new ErrorClass(error.message, 500));  
+    }
+});
+
+
+
 export const postcontent = catchAsync(async(req: Request, res: Response, next: NextFunction): Promise<any> => {
 	if(!req.body.type || !req.body.link || !req.body.title || !req.body.tags) {
 		return next(new ErrorClass('Fields are Empty', 403))
@@ -61,4 +94,29 @@ export const postcontent = catchAsync(async(req: Request, res: Response, next: N
 	await ContentModel.create(req.body)
 
 	res.status(200).json({status: 'Success', message: 'Successfully posted the content'})
+})
+
+//replace promise<any> 
+export const deletecontent = catchAsync(async(req: Request, res: Response, next: NextFunction) : Promise<any> => {
+	const id = req.params.id
+	if (!id) {
+        return next(new ErrorClass('No ID is passed', 400)); 
+    }
+
+    try {
+
+        const content = await ContentModel.deleteOne({ _id: id });
+		console.log(content)
+        if (content.deletedCount === 0) {
+            return next(new ErrorClass('Content not found', 404));  
+        }
+
+        res.status(200).json({
+            status: 'Success',
+            message: 'Deleted the content',
+            content: content,
+        });
+    } catch (error: any) {
+        return next(new ErrorClass(error.message, 500));  
+    }
 })

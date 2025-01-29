@@ -1,4 +1,4 @@
-import { Schema, model } from "mongoose";
+import mongoose, { Schema, model } from "mongoose";
 
 const contentSchema = new Schema({
     title: {
@@ -14,8 +14,14 @@ const contentSchema = new Schema({
         required: [true, 'A type(s) is a must for a content']
     },
     tags:{
-        type: [String],       
+        type: [{
+            type: mongoose.Types.ObjectId, ref: 'Tags'
+        }],       
         required: [true, 'A tag(s) is a must for a content']
+    },
+    userId: {
+        type: mongoose.Types.ObjectId, ref: 'User',
+        required: true
     }
 })
 
