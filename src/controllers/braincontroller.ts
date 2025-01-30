@@ -60,10 +60,14 @@ export const getcontent = catchAsync(async(req: Request, res: Response, next: Ne
 		path: 'userId',
 		select: '-password'
 	})
+
+	if(!content) {
+		next(new ErrorClass('No Content Found', 404))
+	}
 	res.status(200).json({
 		status: 'Success',
 		message: 'Successfully fetched contents',
-		content
+		data: content
 	})
 })
 
@@ -93,8 +97,6 @@ export const getonecontent = catchAsync(async (req: Request, res: Response, next
     }
 });
 
-
-
 export const postcontent = catchAsync(async(req: Request, res: Response, next: NextFunction): Promise<Response | void> => {
 	// if(!req.body.type || !req.body.link || !req.body.title || !req.body.tags) {
 	// 	return next(new ErrorClass('Fields are Empty', 403))
@@ -116,13 +118,13 @@ export const postcontent = catchAsync(async(req: Request, res: Response, next: N
 	res.status(200).json({status: 'Success', message: 'Successfully posted the content'})
 })
 
-//replace promise<Response | void> 
 export const deletecontent = catchAsync(async(req: Request, res: Response, next: NextFunction) : Promise<Response | void> => {
-	const id = req.params.id
+	const id = req.params.id;
+
 	if (!id) {
         return next(new ErrorClass('No ID is passed', 400)); 
     }
-	const userId =req.user.userId;
+	const userId = req.user.userId;
     try {
 
         const content = await ContentModel.deleteOne({ _id: id , userId: userId});
@@ -141,7 +143,6 @@ export const deletecontent = catchAsync(async(req: Request, res: Response, next:
     }
 })
 
-//search by user and get all the contents for that user
 export const getfromshareLink = catchAsync(async(req:Request, res: Response, next: NextFunction): Promise<any>  => {
 	const shareLink = req.params.shareLink;
 	if(!shareLink) {

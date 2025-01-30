@@ -1,5 +1,5 @@
 import mongoose, { Schema, model } from "mongoose";
-import { BrainModel } from "./brainmodel";
+
 const contentSchema = new Schema({
     title: {
         type: String,       
@@ -14,9 +14,7 @@ const contentSchema = new Schema({
         required: [true, 'A type(s) is a must for a content']
     },
     tags:{
-        type: [{
-            type: mongoose.Types.ObjectId, ref: 'Tags'
-        }],       
+        type: [String],       
         required: [true, 'A tag(s) is a must for a content']
     },
     userId: {
