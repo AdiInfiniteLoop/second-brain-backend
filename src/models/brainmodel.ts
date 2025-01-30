@@ -1,7 +1,16 @@
 import argon2 from 'argon2'
-import mongoose from "mongoose";
+import mongoose, { Model } from "mongoose";
 
-const brainSchema = new mongoose.Schema(
+interface IBrain extends Document {
+    username: string;
+    password: string;
+    share: Boolean;
+    shareLink: string,
+    comparePassword(candidatePassword: string): Promise<boolean>
+}
+
+
+const brainSchema = new mongoose.Schema<IBrain>(
     {
         username: {
             type: String,
@@ -16,6 +25,21 @@ const brainSchema = new mongoose.Schema(
             minlength:[8, 'A minimum of 8 length is required for a user'],
             maxlength: [20, 'A maximum of 20 length is required for a user'],
             // select: false not working suting populating for some reason
+        },
+        share: {
+            type: Boolean,
+            default: false
+        },
+        shareLink: {
+            type: String,
+            validate: {
+                validator:  function(this: any, value: string) {
+                    return !this.share  || this.share && value
+                    
+                }, 
+                message: 'Sharing must be enabled'
+            }
+    
         }
     }
 )
@@ -33,6 +57,11 @@ brainSchema.pre('save', async function(next) {
     catch(err) {
         console.log("An error occured!!", err)
     }
+    next()
 })
 
-export const BrainModel = mongoose.model('BrainModel', brainSchema)
+brainSchema.methods.comparePassword = async function (candidatePassword: string) {
+    return await argon2.verify(this.password, candidatePassword);
+};
+
+export const BrainModel: Model<IBrain> = mongoose.model<IBrain>('BrainModel', brainSchema)

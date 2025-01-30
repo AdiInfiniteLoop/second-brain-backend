@@ -4,9 +4,9 @@ import { BrainModel } from "../models/brainmodel"
 import { ContentModel } from "../models/contentmodel"
 import { ErrorClass } from "../utils/errorClass"
 import jwt from 'jsonwebtoken'
+import crypto from 'crypto'
 
-
-export const signup = catchAsync(async (req: Request, res: Response, next: NextFunction): Promise<any> => {
+export const signup = catchAsync(async (req: Request, res: Response, next: NextFunction): Promise<Response | void> => {
 	const user = await BrainModel.findOne({username: req.body.username})
 	try {
 			
@@ -38,7 +38,7 @@ export const login = catchAsync(async(req: Request, res: Response, next: NextFun
 
    if(user && process.env.JWT_SECRET) {
 	const token = jwt.sign({ _id: user._id.toString() }, process.env.JWT_SECRET, {
-		expiresIn: '2 days',
+		expiresIn: '1 day',
 	  });
 	res.status(200).json({status: 'Success', message: 'TOKEN Sent', token})
    }
@@ -51,8 +51,11 @@ export const login = catchAsync(async(req: Request, res: Response, next: NextFun
 })
 
 
-export const getcontent = catchAsync(async(req: Request, res: Response, next: NextFunction): Promise<any> => {
+export const getcontent = catchAsync(async(req: Request, res: Response, next: NextFunction): Promise<Response | void> => {
 	const userId = req.user._id
+	if(!userId) {
+		next(new ErrorClass('Not AUTHORIZED', 401))
+	}
 	const content = await ContentModel.find({userId: userId}).populate({
 		path: 'userId',
 		select: '-password'
@@ -64,7 +67,7 @@ export const getcontent = catchAsync(async(req: Request, res: Response, next: Ne
 	})
 })
 
-export const getonecontent = catchAsync(async (req: Request, res: Response, next: NextFunction): Promise<any> => {
+export const getonecontent = catchAsync(async (req: Request, res: Response, next: NextFunction): Promise<Response | void> => {
     const { id } = req.params; 
 
     if (!id) {
@@ -85,14 +88,14 @@ export const getonecontent = catchAsync(async (req: Request, res: Response, next
             message: 'Successfully fetched content',
             content: content,
         });
-    } catch (error: any) {
+    } catch (error:  any) {
         return next(new ErrorClass(error.message, 500));  
     }
 });
 
 
 
-export const postcontent = catchAsync(async(req: Request, res: Response, next: NextFunction): Promise<any> => {
+export const postcontent = catchAsync(async(req: Request, res: Response, next: NextFunction): Promise<Response | void> => {
 	// if(!req.body.type || !req.body.link || !req.body.title || !req.body.tags) {
 	// 	return next(new ErrorClass('Fields are Empty', 403))
 	// }
@@ -113,16 +116,16 @@ export const postcontent = catchAsync(async(req: Request, res: Response, next: N
 	res.status(200).json({status: 'Success', message: 'Successfully posted the content'})
 })
 
-//replace promise<any> 
-export const deletecontent = catchAsync(async(req: Request, res: Response, next: NextFunction) : Promise<any> => {
+//replace promise<Response | void> 
+export const deletecontent = catchAsync(async(req: Request, res: Response, next: NextFunction) : Promise<Response | void> => {
 	const id = req.params.id
 	if (!id) {
         return next(new ErrorClass('No ID is passed', 400)); 
     }
-
+	const userId =req.user.userId;
     try {
 
-        const content = await ContentModel.deleteOne({ _id: id });
+        const content = await ContentModel.deleteOne({ _id: id , userId: userId});
 		console.log(content)
         if (content.deletedCount === 0) {
             return next(new ErrorClass('Content not found', 404));  
@@ -137,3 +140,60 @@ export const deletecontent = catchAsync(async(req: Request, res: Response, next:
         return next(new ErrorClass(error.message, 500));  
     }
 })
+
+//search by user and get all the contents for that user
+export const getfromshareLink = catchAsync(async(req:Request, res: Response, next: NextFunction): Promise<any>  => {
+	const shareLink = req.params.shareLink;
+	if(!shareLink) {
+		return next(new ErrorClass('No share Link Found', 403))
+	}
+	const userID = await BrainModel.findOne({shareLink})
+	if(!userID) {
+		return next(new ErrorClass('No User found', 404))
+	}
+
+	const contents = await ContentModel.find({userId: userID._id})
+	if(!contents) {
+		return next(new ErrorClass('No Such User Present', 404))
+	}
+	res.status(200).json({
+		status: 'Success',
+		message: 'Got all the data', 
+		data: contents
+	})
+})
+
+export const sharelink = catchAsync(async(req:Request, res: Response, next: NextFunction): Promise< Response | void>  => {
+	const {share} = req.body;
+	if(!share) {
+		return next(new ErrorClass('Share value not provided', 403))
+	}
+
+	const userId = req.user._id
+	if(!userId) {
+		return next( new ErrorClass('Not authenticated', 403))
+	}
+	//generate link using crypto
+	const generatedLink = crypto.randomBytes(16).toString('hex')
+
+	if(!generatedLink) {
+		return next(new ErrorClass('No generated Link available. Retry Again', 403))
+	}
+
+	const us = await BrainModel.updateOne(
+		{ _id: userId }, 
+		{ $set: {share: true ,  shareLink: generatedLink } } 
+	  );
+	  if(us.modifiedCount === 0) {
+		return next(new ErrorClass('Cannot Update',404))
+	  }
+
+
+	res.status(200).json({
+		status: 'Success',
+		message: 'Successfully generated the shareable link',
+		shareableLink: generatedLink
+	})
+	next()
+})
+
