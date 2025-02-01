@@ -5,34 +5,47 @@ import { ContentModel } from "../models/contentmodel"
 import { ErrorClass } from "../utils/errorClass"
 import jwt from 'jsonwebtoken'
 import crypto from 'crypto'
+import { z } from "zod";
+
+const userschema = z.object({
+	username: z.string().min(3, { message: "Must be 3 or more characters long" }),
+	password: z.string().min(8, { message: "Must be 8 or more characters long" })
+})
 
 export const signup = catchAsync(async (req: Request, res: Response, next: NextFunction): Promise<Response | void> => {
+	try {		
+	const validatedData = userschema.parse(req.body);
 	const user = await BrainModel.findOne({username: req.body.username})
-	try {
-			
+
 	if(user) {
 		return next(new ErrorClass("Sorry! The user already exists with this username", 403));
 	}
-		await BrainModel.create(req.body)
+		await BrainModel.create(validatedData)
 		 res.status(200).json({
 			status: 'Success',
 			message: 'User successfully created'
 		})
 	}
-	catch(er: any) {
+	catch(error: unknown) {
 		// console.log(er)
-		return next(new ErrorClass(er.message, 403))
+			if (error instanceof z.ZodError) {
+				return res.status(400).json({ status: "Fail", errors: error.errors });
+			}
+			if (error instanceof Error) {
+				return next(new ErrorClass(error.message, 500));
+			}
+			return next(new ErrorClass("An unknown error occurred", 500));
 	}
-	next()
 })
 
 export const login = catchAsync(async(req: Request, res: Response, next: NextFunction) => {
    const {username, password, passwordConfirm} =  req.body;
+   
    if(password !== passwordConfirm) {
 	return next(new ErrorClass('The passwords do not match', 403))
    }
 
-   const user  = await BrainModel.findOne({username: username})
+   const user  = await BrainModel.findOne({username: username}).lean()
    //⚠️ Warning: Using as string suppresses TypeScript's safety checks. Ensure SECRET_KEY is always set.
 
 
@@ -45,7 +58,6 @@ export const login = catchAsync(async(req: Request, res: Response, next: NextFun
 
    else {
 	 res.status(401).json({status: 'Failed', message: 'No such user found!'})
-
    }
    next()
 })
@@ -54,7 +66,7 @@ export const login = catchAsync(async(req: Request, res: Response, next: NextFun
 export const getcontent = catchAsync(async(req: Request, res: Response, next: NextFunction): Promise<Response | void> => {
 	const userId = req.user._id
 	if(!userId) {
-		next(new ErrorClass('Not AUTHORIZED', 401))
+		return next(new ErrorClass('Not AUTHORIZED', 401))
 	}
 	const content = await ContentModel.find({userId: userId}).populate({
 		path: 'userId',
@@ -62,7 +74,7 @@ export const getcontent = catchAsync(async(req: Request, res: Response, next: Ne
 	})
 
 	if(!content) {
-		next(new ErrorClass('No Content Found', 404))
+		return next(new ErrorClass('No Content Found', 404))
 	}
 	res.status(200).json({
 		status: 'Success',
@@ -92,8 +104,11 @@ export const getonecontent = catchAsync(async (req: Request, res: Response, next
             message: 'Successfully fetched content',
             content: content,
         });
-    } catch (error:  any) {
-        return next(new ErrorClass(error.message, 500));  
+    } catch (error:  unknown) {
+		if (error instanceof Error) {
+			return next(new ErrorClass(error.message, 500));
+		}
+		return next(new ErrorClass("An unknown error occurred", 500));
     }
 });
 
@@ -138,8 +153,11 @@ export const deletecontent = catchAsync(async(req: Request, res: Response, next:
             message: 'Deleted the content',
             content: content,
         });
-    } catch (error: any) {
-        return next(new ErrorClass(error.message, 500));  
+    } catch (error: unknown) {
+        if (error instanceof Error) {
+			return next(new ErrorClass(error.message, 500));
+		}
+		return next(new ErrorClass("An unknown error occurred", 500));
     }
 })
 
@@ -163,38 +181,46 @@ export const getfromshareLink = catchAsync(async(req:Request, res: Response, nex
 		data: contents
 	})
 })
+export const sharelink = catchAsync(async (req: Request, res: Response, next: NextFunction): Promise<Response | void> => {
+    const { share } = req.body;
+    if (!share) {
+        return next(new ErrorClass('Share value not provided', 403));
+    }
 
-export const sharelink = catchAsync(async(req:Request, res: Response, next: NextFunction): Promise< Response | void>  => {
-	const {share} = req.body;
-	if(!share) {
-		return next(new ErrorClass('Share value not provided', 403))
-	}
+    const userId = req.user._id;
+    if (!userId) {
+        return next(new ErrorClass('Not authenticated', 403));
+    }
 
-	const userId = req.user._id
-	if(!userId) {
-		return next( new ErrorClass('Not authenticated', 403))
-	}
-	//generate link using crypto
-	const generatedLink = crypto.randomBytes(16).toString('hex')
+    const user = await BrainModel.findById(userId);
 
-	if(!generatedLink) {
-		return next(new ErrorClass('No generated Link available. Retry Again', 403))
-	}
+    if (!user) {
+        return next(new ErrorClass('User not found', 404));
+    }
+	//return already generated link
+    if (user.share && user.shareLink) {
+        return res.status(200).json({
+            status: 'Success',
+            message: 'Shareable link already exists',
+            shareableLink: user.shareLink
+        });
+    }
 
-	const us = await BrainModel.updateOne(
-		{ _id: userId }, 
-		{ $set: {share: true ,  shareLink: generatedLink } } 
-	  );
-	  if(us.modifiedCount === 0) {
-		return next(new ErrorClass('Cannot Update',404))
-	  }
+    const generatedLink = crypto.randomBytes(16).toString('hex');
 
+    const updateResult = await BrainModel.updateOne(
+        { _id: userId },
+        { $set: { share: true, shareLink: generatedLink } }
+    );
 
-	res.status(200).json({
-		status: 'Success',
-		message: 'Successfully generated the shareable link',
-		shareableLink: generatedLink
-	})
-	next()
-})
+    if (updateResult.modifiedCount === 0) {
+        return next(new ErrorClass('Failed to update share link', 500));
+    }
+
+    res.status(200).json({
+        status: 'Success',
+        message: 'Successfully generated the shareable link',
+        shareableLink: generatedLink
+    });
+});
 
