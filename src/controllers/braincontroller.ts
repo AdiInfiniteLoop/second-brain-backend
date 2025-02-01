@@ -68,11 +68,13 @@ export const getcontent = catchAsync(async(req: Request, res: Response, next: Ne
 	if(!userId) {
 		return next(new ErrorClass('Not AUTHORIZED', 401))
 	}
+
+	// console.log( userId)
+
 	const content = await ContentModel.find({userId: userId}).populate({
 		path: 'userId',
 		select: '-password'
 	})
-
 	if(!content) {
 		return next(new ErrorClass('No Content Found', 404))
 	}
@@ -120,13 +122,13 @@ export const postcontent = catchAsync(async(req: Request, res: Response, next: N
 		return next(new ErrorClass('Fields are Empty', 403))
 	}
 	console.log(req)
-	const {title, link, type,} = req.body;
+	const {title, link, type, tags} = req.body;
 	await ContentModel.create({
 		title,
 		link,
 		type,
 		userId: req.user._id,
-		tags: []
+		tags: tags
 	})
 
 
@@ -165,7 +167,7 @@ export const getfromshareLink = catchAsync(async(req:Request, res: Response, nex
 	const shareLink = req.params.shareLink;
 	if(!shareLink) {
 		return next(new ErrorClass('No share Link Found', 403))
-	}
+	} 
 	const userID = await BrainModel.findOne({shareLink})
 	if(!userID) {
 		return next(new ErrorClass('No User found', 404))
